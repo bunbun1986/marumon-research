@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="まるもんリサーチ">
+<title>まるもんリサーチ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root {
+    /* Game Boy LCD palette */
+    --gb0: #0f380f; /* darkest */
+    --gb1: #306230;
+    --gb2: #8bac0f;
+    --gb3: #9bbc0f; /* lightest */
+    --lcd-bg: #8b9c2a;
+    /* Body colors */
+    --body-bg: #bcc0b8;
+    --body-dark: #8a8e86;
+    --body-border: #6e726b;
+    /* Button colors */
+    --btn-ab: #84244e;
+    --btn-dpad: #2c2c2c;
+    --danger: #84244e;
+  }
+  body {
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+    background: var(--body-bg);
+    color: var(--gb0);
+    min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* SCANLINE OVERLAY on the "screen" area */
+  .screen-wrap {
+    max-width: 420px;
+    margin: 0 auto;
+    padding: 0 12px;
+  }
+  .screen {
+    background: var(--lcd-bg);
+    border: 4px solid var(--body-dark);
+    border-radius: 12px;
+    padding: 16px 14px;
+    margin-top: 12px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 0 30px rgba(15,56,15,0.15);
+  }
+  .screen::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(15,56,15,0.04) 2px,
+      rgba(15,56,15,0.04) 4px
+    );
+    pointer-events: none; z-index: 1;
+  }
+
+  /* DOT MATRIX label */
+  .dot-matrix-label {
+    text-align: center;
+    padding: 8px 0 4px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    color: var(--body-dark);
+    letter-spacing: 2px;
+  }
+
+  /* TAB BAR (styled as Game Boy buttons) */
+  .tab-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; justify-content: center; gap: 20px;
+    background: var(--body-bg);
+    border-top: 3px solid var(--body-dark);
+    z-index: 100;
+    padding: 12px 0 calc(20px + env(safe-area-inset-bottom, 0));
+  }
+  .tab-btn {
+    width: 90px; height: 56px;
+    border: none; border-radius: 28px;
+    background: var(--btn-ab);
+    color: #fff;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px;
+    box-shadow: 0 4px 0 #5a1838, 0 6px 10px rgba(0,0,0,0.2);
+    transition: transform 0.05s, box-shadow 0.05s;
+    letter-spacing: -0.5px;
+  }
+  .tab-btn:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 #5a1838;
+  }
+  .tab-btn.active {
+    background: #a62d64;
+    box-shadow: 0 4px 0 #7a2050, 0 6px 10px rgba(0,0,0,0.2);
+  }
+  .tab-btn .tab-icon { font-size: 22px; line-height: 1; }
+
+  /* PAGES */
+  .page { display: none; padding-bottom: 130px; }
+  .page.active { display: block; }
+
+  /* HEADER */
+  .header {
+    text-align: center; padding: 6px 0 10px;
+  }
+  .header h1 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 13px; color: var(--gb0);
+    line-height: 1.6;
+    text-shadow: 2px 2px 0 var(--gb2);
+  }
+  .header p {
+    font-family: 'DotGothic16', sans-serif;
+    font-size: 12px; color: var(--gb1);
+    margin-top: 4px;
+  }
+
+  /* INPUTS */
+  .input-section { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+  .input-wrap { position: relative; }
+  .input-wrap label {
+    display: block;
+    font-family: 'DotGothic16', sans-serif;
+    font-size: 12px; color: var(--gb1);
+    margin-bottom: 4px; padding-left: 2px;
+  }
+  .input-wrap label::before { content: '▶ '; font-size: 9px; }
+  .input-wrap input {
+    width: 100%; padding: 12px 42px 12px 12px; font-size: 16px;
+    font-family: 'DotGothic16', sans-serif; font-weight: 400;
+    background: var(--gb3); border: 3px solid var(--gb1);
+    border-radius: 6px; color: var(--gb0); outline: none;
+    transition: border-color 0.15s;
+  }
+  .input-wrap input:focus { border-color: var(--gb0); }
+  .input-wrap input::placeholder { color: var(--gb2); }
+  .field-clear {
+    position: absolute; right: 8px; bottom: 9px; width: 26px; height: 26px;
+    border-radius: 50%; border: 2px solid var(--gb1); background: var(--gb2); color: var(--gb0);
+    font-size: 13px; font-weight: 900; cursor: pointer;
+    display: none; align-items: center; justify-content: center; line-height: 1;
+  }
+  .field-clear.show { display: flex; }
+
+  /* AUTOCOMPLETE */
+  .ac-list {
+    position: absolute; left: 0; right: 0; top: 100%;
+    background: var(--gb3); border: 3px solid var(--gb1);
+    border-radius: 6px; margin-top: 2px; max-height: 55vh; overflow-y: auto;
+    z-index: 50; display: none; -webkit-overflow-scrolling: touch;
+    box-shadow: 4px 4px 0 var(--gb1);
+  }
+  .ac-list.show { display: block; }
+  .ac-item {
+    padding: 10px 12px; cursor: pointer; border-bottom: 2px solid var(--gb2);
+    display: flex; align-items: baseline; gap: 6px;
+    font-family: 'DotGothic16', sans-serif;
+  }
+  .ac-item:last-child { border-bottom: none; }
+  .ac-item:active { background: var(--gb2); }
+  .ac-item .ac-name { font-size: 15px; color: var(--gb0); }
+  .ac-item .ac-aka { font-size: 11px; color: var(--gb1); }
+  .ac-item .ac-cat {
+    font-size: 9px; color: var(--gb0); font-family: 'Press Start 2P', monospace;
+    margin-left: auto; flex-shrink: 0;
+    background: var(--gb2); padding: 2px 6px; border-radius: 3px;
+    border: 1px solid var(--gb1);
+  }
+
+  /* BUTTONS */
+  .buttons { display: flex; flex-direction: column; gap: 8px; }
+  .search-btn {
+    display: flex; align-items: center; gap: 10px; width: 100%; padding: 12px;
+    border: 3px solid var(--gb0); border-radius: 8px;
+    font-family: 'DotGothic16', sans-serif;
+    font-size: 15px; cursor: pointer;
+    transition: transform 0.05s, box-shadow 0.05s;
+    text-align: left; color: var(--gb0);
+    -webkit-user-select: none; user-select: none;
+    background: var(--gb3);
+    box-shadow: 3px 3px 0 var(--gb1);
+    position: relative;
+    text-decoration: none;
+  }
+  .search-btn.disabled {
+    opacity: 0.35; pointer-events: none;
+  }
+  .search-btn .icon {
+    width: 32px; height: 32px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px; flex-shrink: 0;
+    background: var(--gb0); color: var(--gb3);
+  }
+  .search-btn .label { flex: 1; }
+  .search-btn .label .name { display: block; line-height: 1.2; font-size: 15px; }
+  .search-btn .label .desc { display: block; font-size: 11px; color: var(--gb1); margin-top: 1px; }
+  .search-btn .arrow {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px; color: var(--gb1); flex-shrink: 0;
+  }
+
+  /* HISTORY */
+  .history-header {
+    display: flex; align-items: center; justify-content: space-between; padding: 6px 0 10px;
+  }
+  .history-header h2 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px; color: var(--gb0);
+    text-shadow: 2px 2px 0 var(--gb2);
+  }
+  .history-header .count {
+    font-family: 'DotGothic16', sans-serif;
+    font-size: 12px; color: var(--gb1);
+  }
+  .history-empty {
+    text-align: center; color: var(--gb1); padding: 40px 0;
+    font-family: 'DotGothic16', sans-serif; font-size: 13px; line-height: 2;
+  }
+  .history-empty .empty-icon { font-size: 36px; margin-bottom: 8px; }
+  .history-list { display: flex; flex-direction: column; gap: 6px; }
+  .history-item {
+    display: flex; align-items: center; background: var(--gb3);
+    border: 3px solid var(--gb1); border-radius: 6px; overflow: hidden;
+    box-shadow: 2px 2px 0 var(--gb1);
+  }
+  .history-use {
+    flex: 1; padding: 10px; border: none; background: none;
+    color: var(--gb0); font-family: 'DotGothic16', sans-serif;
+    text-align: left; cursor: pointer; min-width: 0;
+  }
+  .history-use .h-maker { font-size: 11px; color: var(--gb1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history-use .h-model { font-size: 15px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history-use .h-single { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history-use .h-date { font-size: 10px; color: var(--gb2); margin-top: 2px; }
+  .history-del {
+    width: 44px; align-self: stretch; border: none; background: none;
+    color: var(--gb1); font-size: 16px; font-weight: 900; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; border-left: 2px solid var(--gb1);
+  }
+  .history-del:active { background: var(--gb2); color: var(--gb0); }
+  .clear-all-wrap { text-align: center; margin-top: 16px; }
+  .clear-all-btn {
+    padding: 8px 20px; border: 3px solid var(--btn-ab); border-radius: 20px;
+    background: none; color: var(--btn-ab);
+    font-family: 'DotGothic16', sans-serif; font-size: 13px; cursor: pointer;
+    box-shadow: 2px 2px 0 rgba(132,36,78,0.3);
+  }
+  .clear-all-btn:active { transform: translate(1px,1px); box-shadow: none; }
+
+  .footer-msg {
+    text-align: center; margin-top: 14px;
+    font-family: 'DotGothic16', sans-serif;
+    font-size: 10px; color: var(--gb2);
+  }
+
+  /* Power LED */
+  .power-led {
+    display: flex; align-items: center; gap: 6px;
+    padding: 14px 16px 2px;
+    max-width: 420px; margin: 0 auto;
+  }
+  .led-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #c43030; box-shadow: 0 0 6px #ff4040;
+  }
+  .led-label {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 6px; color: var(--body-dark); letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+
+<div class="power-led">
+  <div class="led-dot"></div>
+  <span class="led-label">POWER</span>
+</div>
+
+<div class="dot-matrix-label">DOT MATRIX WITH STEREO SOUND</div>
+
+<div class="screen-wrap">
+<div class="screen">
+
+<!-- SEARCH PAGE -->
+<div class="page active" id="pageSearch">
+  <div class="header">
+    <h1>まるもん<br>リサーチ</h1>
+    <p>▼ メーカーと型番をいれてね ▼</p>
+  </div>
+  <div class="input-section">
+    <div class="input-wrap" id="makerWrap">
+      <label>メーカー</label>
+      <input type="text" id="maker" placeholder="Epiphone" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <button class="field-clear" id="clearMaker" type="button">✕</button>
+      <div class="ac-list" id="acList"></div>
+    </div>
+    <div class="input-wrap">
+      <label>型番</label>
+      <input type="text" id="model" placeholder="PR5EMV" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <button class="field-clear" id="clearModel" type="button">✕</button>
+    </div>
+  </div>
+  <div class="buttons" id="btnContainer">
+    <a class="search-btn" id="btn-yahoo" href="#" target="_blank" rel="noreferrer">
+      <span class="icon">Y!</span>
+      <span class="label"><span class="name">ヤフオク</span><span class="desc">落札済み(sold)</span></span><span class="arrow">▶</span>
+    </a>
+    <a class="search-btn" id="btn-mercari" href="#" target="_blank" rel="noreferrer">
+      <span class="icon">メル</span>
+      <span class="label"><span class="name">メルカリ</span><span class="desc">売り切れ(sold)</span></span><span class="arrow">▶</span>
+    </a>
+    <a class="search-btn" id="btn-ebay" href="#" target="_blank" rel="noreferrer">
+      <span class="icon">eB</span>
+      <span class="label"><span class="name">eBay</span><span class="desc">Sold listings</span></span><span class="arrow">▶</span>
+    </a>
+    <a class="search-btn" id="btn-aucfan" href="#" target="_blank" rel="noreferrer">
+      <span class="icon">AF</span>
+      <span class="label"><span class="name">オークファン</span><span class="desc">落札相場(5年)</span></span><span class="arrow">▶</span>
+    </a>
+    <a class="search-btn" id="btn-amazon" href="#" target="_blank" rel="noreferrer">
+      <span class="icon">Am</span>
+      <span class="label"><span class="name">Amazon</span><span class="desc">amazon.co.jp</span></span><span class="arrow">▶</span>
+    </a>
+    <a class="search-btn" id="btn-google" href="#" target="_blank" rel="noreferrer">
+      <span class="icon">G</span>
+      <span class="label"><span class="name">Google</span><span class="desc">ウェブ検索</span></span><span class="arrow">▶</span>
+    </a>
+  </div>
+  <div class="footer-msg">＊ ホームがめんについかすると べんり ＊</div>
+</div>
+
+<!-- HISTORY PAGE -->
+<div class="page" id="pageHistory">
+  <div class="history-header"><h2>けんさくりれき</h2><span class="count" id="historyCount"></span></div>
+  <div id="historyContent"></div>
+</div>
+
+</div><!-- /screen -->
+</div><!-- /screen-wrap -->
+
+<!-- TAB BAR -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="showPage('search')">
+    <span class="tab-icon">🔍</span>A
+  </button>
+  <button class="tab-btn" onclick="showPage('history')">
+    <span class="tab-icon">📋</span>B
+  </button>
+</div>
+
+<script>
+const MAKERS_RAW = [
+// ===== オーディオ =====
+["SANSUI","サンスイ,山水","ｵｰﾃﾞｨｵ"],["TRIO","トリオ","ｵｰﾃﾞｨｵ"],["NAKAMICHI","ナカミチ","ｵｰﾃﾞｨｵ"],
+["Accuphase","アキュフェーズ","ｵｰﾃﾞｨｵ"],["Luxman","ラックスマン,LUXMAN","ｵｰﾃﾞｨｵ"],
+["McIntosh","マッキントッシュ","ｵｰﾃﾞｨｵ"],["Marantz","マランツ","ｵｰﾃﾞｨｵ"],
+["Denon","デノン,デンオン,DENON","ｵｰﾃﾞｨｵ"],["Pioneer","パイオニア","ｵｰﾃﾞｨｵ"],
+["Onkyo","オンキヨー,ONKYO","ｵｰﾃﾞｨｵ"],["Technics","テクニクス","ｵｰﾃﾞｨｵ"],
+["TEAC","ティアック","ｵｰﾃﾞｨｵ"],["TASCAM","タスカム","ｵｰﾃﾞｨｵ"],
+["DIATONE","ダイヤトーン","ｵｰﾃﾞｨｵ"],["Lo-D","ローディー","ｵｰﾃﾞｨｵ"],
+["Aurex","オーレックス","ｵｰﾃﾞｨｵ"],["Victor","ビクター,JVC","ｵｰﾃﾞｨｵ"],
+["JVC","ジェーブイシー,ビクター","ｵｰﾃﾞｨｵ"],["JBL","ジェービーエル","ｵｰﾃﾞｨｵ"],
+["BOSE","ボーズ","ｵｰﾃﾞｨｵ"],["Harman Kardon","ハーマンカードン","ｵｰﾃﾞｨｵ"],
+["Mark Levinson","マークレビンソン","ｵｰﾃﾞｨｵ"],["Krell","クレル","ｵｰﾃﾞｨｵ"],
+["Rotel","ローテル","ｵｰﾃﾞｨｵ"],["NAD","エヌエーディー","ｵｰﾃﾞｨｵ"],
+["Cambridge Audio","ケンブリッジ","ｵｰﾃﾞｨｵ"],["Naim","ネイム","ｵｰﾃﾞｨｵ"],
+["Linn","リン","ｵｰﾃﾞｨｵ"],["KEF","ケーイーエフ","ｵｰﾃﾞｨｵ"],
+["B&W","ビーアンドダブリュー,Bowers","ｵｰﾃﾞｨｵ"],["Tannoy","タンノイ","ｵｰﾃﾞｨｵ"],
+["Klipsch","クリプシュ","ｵｰﾃﾞｨｵ"],["Altec Lansing","アルテック","ｵｰﾃﾞｨｵ"],
+["Electro-Voice","エレクトロボイス,EV","ｵｰﾃﾞｨｵ"],["Focal","フォーカル","ｵｰﾃﾞｨｵ"],
+["Dynaudio","ディナウディオ","ｵｰﾃﾞｨｵ"],["Wharfedale","ワーフェデール","ｵｰﾃﾞｨｵ"],
+["Celestion","セレッション","ｵｰﾃﾞｨｵ"],["Infinity","インフィニティ","ｵｰﾃﾞｨｵ"],
+["Polk Audio","ポークオーディオ","ｵｰﾃﾞｨｵ"],["Bang & Olufsen","B&O,バングアンドオルフセン","ｵｰﾃﾞｨｵ"],
+["Sonos","ソノス","ｵｰﾃﾞｨｵ"],["REVOX","ルボックス","ｵｰﾃﾞｨｵ"],["Studer","スチューダー","ｵｰﾃﾞｨｵ"],
+["Thorens","トーレンス","ｵｰﾃﾞｨｵ"],["Garrard","ガラード","ｵｰﾃﾞｨｵ"],["Micro Seiki","マイクロセイキ","ｵｰﾃﾞｨｵ"],
+["Audio-Technica","オーディオテクニカ,オーテク","ｵｰﾃﾞｨｵ"],
+["Shure","シュアー,シュア","ｵｰﾃﾞｨｵ"],["Sennheiser","ゼンハイザー","ｵｰﾃﾞｨｵ"],
+["AKG","エーケージー","ｵｰﾃﾞｨｵ"],["Beyerdynamic","ベイヤーダイナミック","ｵｰﾃﾞｨｵ"],
+["Fostex","フォステクス","ｵｰﾃﾞｨｵ"],["Ortofon","オルトフォン","ｵｰﾃﾞｨｵ"],
+["SAEC","サエク","ｵｰﾃﾞｨｵ"],["Aiwa","アイワ","ｵｰﾃﾞｨｵ"],["Akai","アカイ,赤井","ｵｰﾃﾞｨｵ"],
+["Crown","クラウン","ｵｰﾃﾞｨｵ"],["DBX","ディービーエックス","ｵｰﾃﾞｨｵ"],
+["Neumann","ノイマン","ｵｰﾃﾞｨｵ"],["Rode","ロード","ｵｰﾃﾞｨｵ"],
+["Universal Audio","UA,ユニバーサルオーディオ","ｵｰﾃﾞｨｵ"],["Yamaha","ヤマハ","ｵｰﾃﾞｨｵ"],
+["Coral","コーラル","ｵｰﾃﾞｨｵ"],["Kenwood","ケンウッド","ｵｰﾃﾞｨｵ"],
+["Quad","クォード,QUAD","ｵｰﾃﾞｨｵ"],["Leak","リーク","ｵｰﾃﾞｨｵ"],
+["Spendor","スペンドール","ｵｰﾃﾞｨｵ"],["Harbeth","ハーベス","ｵｰﾃﾞｨｵ"],
+["Dali","ダリ,DALI","ｵｰﾃﾞｨｵ"],["Elac","エラック","ｵｰﾃﾞｨｵ"],
+["Monitor Audio","モニターオーディオ","ｵｰﾃﾞｨｵ"],
+["Sonus Faber","ソナスファベール","ｵｰﾃﾞｨｵ"],["Wilson Audio","ウィルソン","ｵｰﾃﾞｨｵ"],
+["Esoteric","エソテリック","ｵｰﾃﾞｨｵ"],["Pass Labs","パスラボ","ｵｰﾃﾞｨｵ"],
+["Stax","スタックス","ｵｰﾃﾞｨｵ"],["Final","ファイナル","ｵｰﾃﾞｨｵ"],
+["Astell&Kern","アステルアンドケルン","ｵｰﾃﾞｨｵ"],["FiiO","フィーオ","ｵｰﾃﾞｨｵ"],
+["Chord","コード,CHORD","ｵｰﾃﾞｨｵ"],["Wadia","ワディア","ｵｰﾃﾞｨｵ"],["dCS","ディーシーエス","ｵｰﾃﾞｨｵ"],
+// ===== DJ =====
+["Vestax","ベスタクス","DJ"],["Pioneer DJ","パイオニアDJ","DJ"],["Rane","レーン","DJ"],
+// ===== 無線 =====
+["ICOM","アイコム","ﾑｾﾝ"],["YAESU","ヤエス,八重洲","ﾑｾﾝ"],
+["KENWOOD","ケンウッド","ﾑｾﾝ"],["ALINCO","アルインコ","ﾑｾﾝ"],
+["STANDARD","スタンダード","ﾑｾﾝ"],["JRC","日本無線","ﾑｾﾝ"],
+["AOR","エーオーアール","ﾑｾﾝ"],["DIAMOND","ダイヤモンド,第一電波","ﾑｾﾝ"],
+["COMET","コメット","ﾑｾﾝ"],["Collins","コリンズ","ﾑｾﾝ"],["Drake","ドレイク","ﾑｾﾝ"],
+["Hallicrafters","ハリクラフターズ","ﾑｾﾝ"],["Elecraft","エレクラフト","ﾑｾﾝ"],
+["MFJ","エムエフジェー","ﾑｾﾝ"],
+// ===== ギター / ベース =====
+["Fender","フェンダー","ｷﾞﾀｰ"],["Gibson","ギブソン","ｷﾞﾀｰ"],["Epiphone","エピフォン","ｷﾞﾀｰ"],
+["Ibanez","アイバニーズ","ｷﾞﾀｰ"],["ESP","イーエスピー","ｷﾞﾀｰ"],["Jackson","ジャクソン","ｷﾞﾀｰ"],
+["PRS","ポールリードスミス,Paul Reed Smith","ｷﾞﾀｰ"],["Gretsch","グレッチ","ｷﾞﾀｰ"],
+["Rickenbacker","リッケンバッカー","ｷﾞﾀｰ"],["Martin","マーティン,マーチン","ｷﾞﾀｰ"],
+["Taylor","テイラー","ｷﾞﾀｰ"],["Guild","ギルド","ｷﾞﾀｰ"],["Ovation","オベーション","ｷﾞﾀｰ"],
+["Takamine","タカミネ","ｷﾞﾀｰ"],["Aria","アリア","ｷﾞﾀｰ"],["Tokai","トーカイ,東海","ｷﾞﾀｰ"],
+["Greco","グレコ","ｷﾞﾀｰ"],["Fernandes","フェルナンデス","ｷﾞﾀｰ"],["Fujigen","フジゲン,FGN","ｷﾞﾀｰ"],
+["Squier","スクワイヤー","ｷﾞﾀｰ"],["Schecter","シェクター","ｷﾞﾀｰ"],["Dean","ディーン","ｷﾞﾀｰ"],
+["BC Rich","ビーシーリッチ","ｷﾞﾀｰ"],["Music Man","ミュージックマン,ERNIE BALL","ｷﾞﾀｰ"],
+["Warwick","ワーウィック","ｷﾞﾀｰ"],["Sadowsky","サドウスキー","ｷﾞﾀｰ"],
+["Hofner","ヘフナー","ｷﾞﾀｰ"],["G&L","ジーアンドエル","ｷﾞﾀｰ"],["Suhr","サー","ｷﾞﾀｰ"],
+["Bacchus","バッカス","ｷﾞﾀｰ"],["Momose","モモセ","ｷﾞﾀｰ"],["Moon","ムーン","ｷﾞﾀｰ"],
+["Morris","モーリス","ｷﾞﾀｰ"],["K.Yairi","Kヤイリ","ｷﾞﾀｰ"],["S.Yairi","Sヤイリ","ｷﾞﾀｰ"],
+// ===== アンプ / エフェクター =====
+["Marshall","マーシャル","ｱﾝﾌﾟ"],["Vox","ヴォックス","ｱﾝﾌﾟ"],["Mesa Boogie","メサブギー","ｱﾝﾌﾟ"],
+["Orange","オレンジ","ｱﾝﾌﾟ"],["Blackstar","ブラックスター","ｱﾝﾌﾟ"],["Peavey","ピーヴィー","ｱﾝﾌﾟ"],
+["Ampeg","アンペグ","ｱﾝﾌﾟ"],["Bogner","ボグナー","ｱﾝﾌﾟ"],
+["Kemper","ケンパー","ｱﾝﾌﾟ"],["Line 6","ラインシックス","ｱﾝﾌﾟ"],
+["Boss","ボス","ｴﾌｪｸﾀ"],["MXR","エムエックスアール","ｴﾌｪｸﾀ"],
+["Electro-Harmonix","エレクトロハーモニクス,EHX","ｴﾌｪｸﾀ"],
+["Strymon","ストライモン","ｴﾌｪｸﾀ"],["Eventide","イーブンタイド","ｴﾌｪｸﾀ"],
+["Dunlop","ダンロップ","ｴﾌｪｸﾀ"],["Zoom","ズーム","ｴﾌｪｸﾀ"],
+["Xotic","エキゾチック","ｴﾌｪｸﾀ"],["Fulltone","フルトーン","ｴﾌｪｸﾀ"],
+["Maxon","マクソン","ｴﾌｪｸﾀ"],["Providence","プロビデンス","ｴﾌｪｸﾀ"],
+["Free The Tone","フリーザトーン","ｴﾌｪｸﾀ"],
+// ===== キーボード / シンセ =====
+["Roland","ローランド","ｼﾝｾ"],["KORG","コルグ","ｼﾝｾ"],["Nord","ノード","ｼﾝｾ"],
+["Moog","モーグ","ｼﾝｾ"],["Sequential","シーケンシャル","ｼﾝｾ"],["Hammond","ハモンド","ｼﾝｾ"],
+["Kawai","カワイ,河合","ｼﾝｾ"],["Oberheim","オーバーハイム","ｼﾝｾ"],
+["Elektron","エレクトロン","ｼﾝｾ"],["Novation","ノベーション","ｼﾝｾ"],
+["Arturia","アートリア","ｼﾝｾ"],["Teenage Engineering","ティーンエイジ","ｼﾝｾ"],
+// ===== ドラム =====
+["Pearl","パール","ﾄﾞﾗﾑ"],["TAMA","タマ","ﾄﾞﾗﾑ"],["DW","ディーダブリュー","ﾄﾞﾗﾑ"],
+["Ludwig","ラディック","ﾄﾞﾗﾑ"],["Zildjian","ジルジャン","ﾄﾞﾗﾑ"],["Sabian","セイビアン","ﾄﾞﾗﾑ"],
+// ===== PA =====
+["Mackie","マッキー","PA"],["Focusrite","フォーカスライト","PA"],["Behringer","ベリンガー","PA"],
+["SSL","ソリッドステートロジック","PA"],["Neve","ニーヴ","PA"],["Genelec","ジェネレック","PA"],
+// ===== 管楽器 =====
+["Selmer","セルマー","ｶﾝｶﾞｯｷ"],["Yanagisawa","ヤナギサワ","ｶﾝｶﾞｯｷ"],
+["Buffet Crampon","ビュッフェクランポン","ｶﾝｶﾞｯｷ"],["Bach","バック","ｶﾝｶﾞｯｷ"],
+["Muramatsu","ムラマツ,村松","ｶﾝｶﾞｯｷ"],
+// ===== 家電 =====
+["Sony","ソニー,SONY","ｶﾃﾞﾝ"],["Panasonic","パナソニック,ナショナル,National","ｶﾃﾞﾝ"],
+["Sharp","シャープ,SHARP","ｶﾃﾞﾝ"],["Toshiba","東芝,REGZA","ｶﾃﾞﾝ"],
+["Hitachi","日立,ヒタチ","ｶﾃﾞﾝ"],["Mitsubishi Electric","三菱電機","ｶﾃﾞﾝ"],
+["NEC","エヌイーシー,日本電気","ｶﾃﾞﾝ"],["Fujitsu","富士通","ｶﾃﾞﾝ"],
+["Casio","カシオ","ｶﾃﾞﾝ"],["Sanyo","サンヨー,三洋","ｶﾃﾞﾝ"],
+["Philips","フィリップス","ｶﾃﾞﾝ"],["Samsung","サムスン,Galaxy","ｶﾃﾞﾝ"],
+["LG","エルジー","ｶﾃﾞﾝ"],["Apple","アップル","ｶﾃﾞﾝ"],
+["Hisense","ハイセンス","ｶﾃﾞﾝ"],["TCL","ティーシーエル","ｶﾃﾞﾝ"],
+["Xiaomi","シャオミ","ｶﾃﾞﾝ"],["Haier","ハイアール","ｶﾃﾞﾝ"],["AQUA","アクア","ｶﾃﾞﾝ"],
+["Zojirushi","象印","ｶﾃﾞﾝ"],["Tiger","タイガー","ｶﾃﾞﾝ"],["DeLonghi","デロンギ","ｶﾃﾞﾝ"],
+["Balmuda","バルミューダ","ｶﾃﾞﾝ"],["T-fal","ティファール","ｶﾃﾞﾝ"],
+["Vitamix","バイタミックス","ｶﾃﾞﾝ"],["Siroca","シロカ","ｶﾃﾞﾝ"],
+["Yamazen","山善","ｶﾃﾞﾝ"],["Twinbird","ツインバード","ｶﾃﾞﾝ"],
+["Iris Ohyama","アイリスオーヤマ","ｶﾃﾞﾝ"],
+["Daikin","ダイキン","ｶﾃﾞﾝ"],["Dyson","ダイソン","ｶﾃﾞﾝ"],
+["Corona","コロナ","ｶﾃﾞﾝ"],["Toyotomi","トヨトミ","ｶﾃﾞﾝ"],["Aladdin","アラジン","ｶﾃﾞﾝ"],
+["Rinnai","リンナイ","ｶﾃﾞﾝ"],["Paloma","パロマ","ｶﾃﾞﾝ"],["Noritz","ノーリツ","ｶﾃﾞﾝ"],
+["iRobot","アイロボット,ルンバ","ｶﾃﾞﾝ"],["Roborock","ロボロック","ｶﾃﾞﾝ"],
+["Miele","ミーレ","ｶﾃﾞﾝ"],["Electrolux","エレクトロラックス","ｶﾃﾞﾝ"],["Karcher","ケルヒャー","ｶﾃﾞﾝ"],
+["Braun","ブラウン","ｶﾃﾞﾝ"],["Omron","オムロン","ｶﾃﾞﾝ"],["Tanita","タニタ","ｶﾃﾞﾝ"],
+["Brother","ブラザー","ｶﾃﾞﾝ"],["Epson","エプソン","ｶﾃﾞﾝ"],
+["MUJI","無印良品,ムジ","ｶﾃﾞﾝ"],["Nitori","ニトリ","ｶﾃﾞﾝ"],
+// ===== PC =====
+["Lenovo","レノボ","PC"],["Dell","デル","PC"],["HP","ヒューレットパッカード","PC"],
+["ASUS","エイスース","PC"],["MSI","エムエスアイ","PC"],
+["Microsoft","マイクロソフト,Surface","PC"],["Logicool","ロジクール","PC"],
+["Buffalo","バッファロー","PC"],["EIZO","エイゾー,ナナオ","PC"],["Anker","アンカー","PC"],
+// ===== カメラ =====
+["Canon","キヤノン,キャノン","ｶﾒﾗ"],["Nikon","ニコン","ｶﾒﾗ"],
+["Olympus","オリンパス","ｶﾒﾗ"],["Pentax","ペンタックス","ｶﾒﾗ"],
+["Fujifilm","富士フイルム","ｶﾒﾗ"],["Ricoh","リコー","ｶﾒﾗ"],
+["Leica","ライカ","ｶﾒﾗ"],["Hasselblad","ハッセルブラッド","ｶﾒﾗ"],
+["Minolta","ミノルタ","ｶﾒﾗ"],["Sigma","シグマ","ｶﾒﾗ"],["Tamron","タムロン","ｶﾒﾗ"],
+["Contax","コンタックス","ｶﾒﾗ"],["GoPro","ゴープロ","ｶﾒﾗ"],["DJI","ディージェーアイ","ｶﾒﾗ"],
+// ===== 時計 =====
+["Seiko","セイコー","ﾄｹｲ"],["Citizen","シチズン","ﾄｹｲ"],["Casio G-Shock","ジーショック","ﾄｹｲ"],
+["Rolex","ロレックス","ﾄｹｲ"],["Omega","オメガ","ﾄｹｲ"],["Grand Seiko","グランドセイコー","ﾄｹｲ"],
+["Hamilton","ハミルトン","ﾄｹｲ"],["Tag Heuer","タグホイヤー","ﾄｹｲ"],
+// ===== 工具 =====
+["Makita","マキタ","ｺｳｸﾞ"],["HiKOKI","ハイコーキ,日立工機","ｺｳｸﾞ"],
+["Bosch","ボッシュ","ｺｳｸﾞ"],["Snap-on","スナップオン","ｺｳｸﾞ"],
+["Fluke","フルーク","ｺｳｸﾞ"],["Tektronix","テクトロニクス","ｺｳｸﾞ"],
+["Mitutoyo","ミツトヨ","ｺｳｸﾞ"],["Hakko","白光,ハッコー","ｺｳｸﾞ"],
+// ===== アウトドア =====
+["Shimano","シマノ","ｱｳﾄﾄﾞｱ"],["Daiwa","ダイワ","ｱｳﾄﾄﾞｱ"],
+["Coleman","コールマン","ｱｳﾄﾄﾞｱ"],["Snow Peak","スノーピーク","ｱｳﾄﾄﾞｱ"],
+["The North Face","ノースフェイス","ｱｳﾄﾄﾞｱ"],["Mont-bell","モンベル","ｱｳﾄﾄﾞｱ"],
+// ===== ゲーム =====
+["Nintendo","任天堂,ニンテンドー","ｹﾞｰﾑ"],["PlayStation","プレステ,PS5","ｹﾞｰﾑ"],
+["Xbox","エックスボックス","ｹﾞｰﾑ"],["Sega","セガ","ｹﾞｰﾑ"],["Neo Geo","ネオジオ,SNK","ｹﾞｰﾑ"],
+// ===== ホビー =====
+["Bandai","バンダイ","ﾎﾋﾞｰ"],["Tamiya","タミヤ","ﾎﾋﾞｰ"],
+["Good Smile","グッドスマイル,ねんどろいど","ﾎﾋﾞｰ"],["LEGO","レゴ","ﾎﾋﾞｰ"],
+["Takara Tomy","タカラトミー","ﾎﾋﾞｰ"],["Hot Toys","ホットトイズ","ﾎﾋﾞｰ"],
+];
+
+const MAKERS = MAKERS_RAW.map(r => ({ name: r[0], aliases: r[1].split(',').map(s => s.trim()), cat: r[2] }));
+
+const MAX_HISTORY = 100, STORAGE_KEY = 'souba_history';
+const makerInput = document.getElementById('maker');
+const modelInput = document.getElementById('model');
+const clearMaker = document.getElementById('clearMaker');
+const clearModel = document.getElementById('clearModel');
+const acList = document.getElementById('acList');
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+  if (name === 'search') {
+    document.getElementById('pageSearch').classList.add('active');
+    document.querySelectorAll('.tab-btn')[0].classList.add('active');
+  } else {
+    document.getElementById('pageHistory').classList.add('active');
+    document.querySelectorAll('.tab-btn')[1].classList.add('active');
+    renderHistory();
+  }
+}
+function aucfanEncode(s) { return s.replace(/ /g, '.20').replace(/-/g, '.2d'); }
+function getAucfanPeriod() { const n = new Date(); return (n.getFullYear()-5) + String(n.getMonth()+1).padStart(2,'0') + n.getFullYear() + String(n.getMonth()+1).padStart(2,'0'); }
+
+const btnIds = ['btn-yahoo','btn-mercari','btn-ebay','btn-aucfan','btn-amazon','btn-google'];
+const btns = btnIds.map(id => document.getElementById(id));
+
+function getKeyword() { return [makerInput.value.trim(), modelInput.value.trim()].filter(Boolean).join(' '); }
+
+function updateLinks() {
+  const maker = makerInput.value.trim(), model = modelInput.value.trim();
+  const q = [maker, model].filter(Boolean).join(' ');
+  const has = q.length > 0;
+  clearMaker.classList.toggle('show', makerInput.value.length > 0);
+  clearModel.classList.toggle('show', modelInput.value.length > 0);
+
+  btns.forEach(b => {
+    if (has) { b.classList.remove('disabled'); } else { b.classList.add('disabled'); }
+  });
+
+  if (!has) return;
+
+  const enc = encodeURIComponent(q);
+  document.getElementById('btn-yahoo').href = 'https://auctions.yahoo.co.jp/closedsearch/closedsearch/' + enc + '/0/';
+  document.getElementById('btn-mercari').href = 'https://jp.mercari.com/search?keyword=' + enc + '&status=sold_out';
+  document.getElementById('btn-ebay').href = 'https://www.ebay.com/sch/i.html?_nkw=' + enc + '&LH_Complete=1&LH_Sold=1';
+  document.getElementById('btn-aucfan').href = 'https://aucfan.com/search1/q-' + aucfanEncode(q) + '/s-ya/t-' + getAucfanPeriod() + '/?o=t1';
+  document.getElementById('btn-amazon').href = 'https://www.amazon.co.jp/s?k=' + enc;
+  document.getElementById('btn-google').href = 'https://www.google.com/search?q=' + enc;
+}
+
+// クリック時に履歴保存
+btns.forEach(b => {
+  b.addEventListener('click', function() {
+    const maker = makerInput.value.trim(), model = modelInput.value.trim();
+    if (maker || model) addHistory(maker, model);
+  });
+});
+
+makerInput.addEventListener('input', () => { updateLinks(); showAC(); });
+modelInput.addEventListener('input', updateLinks);
+clearMaker.addEventListener('click', () => { makerInput.value = ''; updateLinks(); hideAC(); makerInput.focus(); });
+clearModel.addEventListener('click', () => { modelInput.value = ''; updateLinks(); modelInput.focus(); });
+
+updateLinks();
+
+const POPULAR = new Set(['Sony','Panasonic','Sharp','Toshiba','Hitachi','Mitsubishi Electric','NEC','Fujitsu',
+  'Pioneer','Denon','Yamaha','Canon','Nikon','Casio','Seiko','Apple','Samsung','LG','Dyson','Daikin',
+  'Fender','Gibson','Roland','KORG','Marshall','BOSE','JBL','ICOM','YAESU','KENWOOD','Makita',
+  'Nintendo','Bandai','Shimano','Olympus','Fujifilm','Rolex','Omega','Epson','Brother']);
+
+function showAC() {
+  const val = makerInput.value.trim().toLowerCase();
+  if (!val.length) { hideAC(); return; }
+  const results = [];
+  for (const m of MAKERS) {
+    const nl = m.name.toLowerCase();
+    let matched = false, matchedAlias = '', score = 0;
+    if (nl.startsWith(val)) { matched = true; score = 100; }
+    if (!matched) for (const a of m.aliases) { if (a.toLowerCase().startsWith(val)) { matched = true; matchedAlias = a; score = 90; break; } }
+    if (!matched && nl.includes(val)) { matched = true; score = 50; }
+    if (!matched) for (const a of m.aliases) { if (a.toLowerCase().includes(val)) { matched = true; matchedAlias = a; score = 40; break; } }
+    if (matched) { if (POPULAR.has(m.name)) score += 50; results.push({ name: m.name, aka: matchedAlias, cat: m.cat, score }); }
+  }
+  results.sort((a, b) => b.score - a.score || a.name.length - b.name.length);
+  const top = results.slice(0, val.length === 1 ? 50 : 15);
+  if (!top.length) { hideAC(); return; }
+  acList.innerHTML = top.map(r => {
+    const aka = r.aka ? '<span class="ac-aka">' + esc(r.aka) + '</span>' : '';
+    return '<div class="ac-item" onmousedown="pickMaker(\'' + esc(r.name).replace(/'/g,"\\'") + '\')">'
+      + '<span class="ac-name">' + esc(r.name) + '</span>' + aka
+      + '<span class="ac-cat">' + esc(r.cat) + '</span></div>';
+  }).join('');
+  acList.classList.add('show');
+}
+function hideAC() { acList.classList.remove('show'); }
+function pickMaker(name) { makerInput.value = name; hideAC(); updateLinks(); modelInput.focus(); }
+makerInput.addEventListener('blur', () => setTimeout(hideAC, 150));
+makerInput.addEventListener('focus', showAC);
+
+function loadHistory() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; } }
+function saveHistory(l) { localStorage.setItem(STORAGE_KEY, JSON.stringify(l)); }
+function addHistory(maker, model) {
+  let l = loadHistory(); l = l.filter(h => !(h.maker === maker && h.model === model));
+  l.unshift({ maker, model, date: new Date().toISOString() });
+  if (l.length > MAX_HISTORY) l = l.slice(0, MAX_HISTORY); saveHistory(l);
+}
+function removeHistory(i) { const l = loadHistory(); l.splice(i, 1); saveHistory(l); renderHistory(); }
+function clearAllHistory() { if (confirm('りれきを ぜんぶ けしますか？')) { saveHistory([]); renderHistory(); } }
+function useHistory(i) {
+  const item = loadHistory()[i]; if (!item) return;
+  makerInput.value = item.maker || ''; modelInput.value = item.model || '';
+  updateLinks(); showPage('search');
+}
+function formatDate(iso) { const d = new Date(iso); return (d.getMonth()+1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+function renderHistory() {
+  const list = loadHistory();
+  document.getElementById('historyCount').textContent = list.length + '/' + MAX_HISTORY;
+  const el = document.getElementById('historyContent');
+  if (!list.length) { el.innerHTML = '<div class="history-empty"><div class="empty-icon">📋</div>りれきは まだ ないよ！<br>けんさく すると ここに きろく されるよ</div>'; return; }
+  let h = '<div class="history-list">';
+  list.forEach((item, i) => {
+    h += '<div class="history-item"><button class="history-use" onclick="useHistory(' + i + ')">';
+    if (item.maker && item.model) h += '<div class="h-maker">' + esc(item.maker) + '</div><div class="h-model">' + esc(item.model) + '</div>';
+    else h += '<div class="h-single">' + esc(item.maker || item.model) + '</div>';
+    h += '<div class="h-date">' + formatDate(item.date) + '</div></button>';
+    h += '<button class="history-del" onclick="removeHistory(' + i + ')">✕</button></div>';
+  });
+  h += '</div><div class="clear-all-wrap"><button class="clear-all-btn" onclick="clearAllHistory()">ぜんぶ けす</button></div>';
+  el.innerHTML = h;
+}
+
+// (search handled via a tag hrefs)
+</script>
+</body>
+</html>
