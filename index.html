@@ -259,10 +259,88 @@
   }
   .clear-all-btn:active { transform: translate(1px,1px); box-shadow: none; }
 
-  .footer-msg {
+  /* Google Lens button */
+  .lens-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 12px;
+    border: 3px solid var(--gb0); border-radius: 8px;
+    font-family: 'DotGothic16', sans-serif; font-size: 14px;
+    cursor: pointer; text-decoration: none; color: var(--gb0);
+    background: var(--gb2);
+    box-shadow: 3px 3px 0 var(--gb1);
+    margin-bottom: 10px;
+  }
+  .lens-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--gb1); }
+  .lens-btn .lens-icon { font-size: 20px; }
+
+  /* Divider */
+  .divider {
+    display: flex; align-items: center; gap: 8px;
+    margin: 12px 0;
+    font-family: 'DotGothic16', sans-serif; font-size: 11px; color: var(--gb1);
+  }
+  .divider::before, .divider::after {
+    content: ''; flex: 1; height: 2px; background: var(--gb1);
+  }
+
+  /* Freeword section */
+  .freeword-section { margin-bottom: 12px; }
+  .freeword-section textarea {
+    width: 100%; height: 60px; padding: 10px 12px; font-size: 15px;
+    font-family: 'DotGothic16', sans-serif;
+    background: var(--gb3); border: 3px solid var(--gb1);
+    border-radius: 6px; color: var(--gb0); outline: none;
+    resize: none; transition: border-color 0.15s;
+  }
+  .freeword-section textarea:focus { border-color: var(--gb0); }
+  .freeword-section textarea::placeholder { color: var(--gb2); }
     text-align: center; margin-top: 14px;
     font-family: 'DotGothic16', sans-serif;
     font-size: 10px; color: var(--gb2);
+  }
+
+  /* LOGIN SCREEN */
+  .login-screen {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--body-bg);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 999;
+  }
+  .login-screen.hidden { display: none; }
+  .login-box {
+    background: var(--lcd-bg);
+    border: 4px solid var(--body-dark);
+    border-radius: 12px; padding: 30px 24px;
+    text-align: center; width: 300px;
+    box-shadow: inset 0 0 30px rgba(15,56,15,0.15);
+  }
+  .login-box h2 {
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px; color: var(--gb0); margin-bottom: 6px;
+    text-shadow: 2px 2px 0 var(--gb2);
+  }
+  .login-box p {
+    font-family: 'DotGothic16', sans-serif;
+    font-size: 12px; color: var(--gb1); margin-bottom: 16px;
+  }
+  .login-box input {
+    width: 100%; padding: 12px; font-size: 16px;
+    font-family: 'DotGothic16', sans-serif;
+    background: var(--gb3); border: 3px solid var(--gb1);
+    border-radius: 6px; color: var(--gb0); outline: none;
+    text-align: center; margin-bottom: 12px;
+  }
+  .login-box input:focus { border-color: var(--gb0); }
+  .login-box .login-btn {
+    width: 100%; padding: 12px; border: 3px solid var(--gb0);
+    border-radius: 8px; background: var(--gb3); color: var(--gb0);
+    font-family: 'DotGothic16', sans-serif; font-size: 15px;
+    cursor: pointer; box-shadow: 3px 3px 0 var(--gb1);
+  }
+  .login-box .login-btn:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--gb1); }
+  .login-error {
+    font-family: 'DotGothic16', sans-serif;
+    font-size: 12px; color: #c43030; margin-top: 8px; display: none;
   }
 
   /* Power LED */
@@ -283,6 +361,21 @@
 </head>
 <body>
 
+<!-- LOGIN SCREEN -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-box">
+    <h2>まるもん<br>リサーチ</h2>
+    <p>▼ パスワードをいれてね ▼</p>
+    <p style="font-size:10px; color:var(--gb2); margin-bottom:12px;">🔑 パスワードは 2026/03/06 にへんこうされたよ</p>
+    <input type="password" id="loginPass" placeholder="パスワード" autocomplete="off">
+    <button class="login-btn" id="loginBtn">▶ はいる</button>
+    <div class="login-error" id="loginError">パスワードがちがうよ！</div>
+  </div>
+</div>
+
+<!-- MAIN CONTENT (hidden until login) -->
+<div id="mainContent" style="display:none;">
+
 <div class="power-led">
   <div class="led-dot"></div>
   <span class="led-label">POWER</span>
@@ -299,6 +392,23 @@
     <h1>まるもん<br>リサーチ</h1>
     <p>▼ メーカーと型番をいれてね ▼</p>
   </div>
+
+  <!-- Google Lens button -->
+  <a class="lens-btn" href="googleapp://lens" id="lensBtn">
+    <span class="lens-icon">📷</span> Googleレンズでよみとり
+  </a>
+
+  <!-- Freeword paste area -->
+  <div class="freeword-section">
+    <div class="input-wrap">
+      <label>フリーワード（レンズのコピーをはりつけ）</label>
+      <textarea id="freeword" placeholder="ここにはりつけてね"></textarea>
+    </div>
+  </div>
+
+  <div class="divider">または</div>
+
+  <!-- Maker/Model inputs -->
   <div class="input-section">
     <div class="input-wrap" id="makerWrap">
       <label>メーカー</label>
@@ -351,7 +461,8 @@
 </div><!-- /screen-wrap -->
 
 <!-- TAB BAR -->
-<div class="tab-bar">
+</div><!-- /mainContent -->
+<div class="tab-bar" id="tabBar" style="display:none;">
   <button class="tab-btn active" onclick="showPage('search')">
     <span class="tab-icon">🔍</span>A
   </button>
@@ -359,6 +470,48 @@
     <span class="tab-icon">📋</span>B
   </button>
 </div>
+
+<script>
+// ============================================================
+// LOGIN (SHA-256 hash check)
+// ============================================================
+const PASS_HASH = 'e0aa90319c34efac1872ab9e6ee28b434a6ef59e3af323bf629a9b7b483d93e3';
+const LOGIN_KEY = 'marumon_v1';
+const LOGIN_DAYS = 30;
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function showMain() {
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('mainContent').style.display = '';
+  document.getElementById('tabBar').style.display = '';
+}
+
+// Check if already logged in (within 30 days)
+const loginExpiry = localStorage.getItem(LOGIN_KEY);
+if (loginExpiry && Date.now() < Number(loginExpiry)) {
+  showMain();
+}
+
+document.getElementById('loginBtn').addEventListener('click', async function() {
+  const pass = document.getElementById('loginPass').value;
+  const hash = await sha256(pass);
+  if (hash === PASS_HASH) {
+    const expiry = Date.now() + LOGIN_DAYS * 24 * 60 * 60 * 1000;
+    localStorage.setItem(LOGIN_KEY, String(expiry));
+    showMain();
+  } else {
+    document.getElementById('loginError').style.display = 'block';
+  }
+});
+
+document.getElementById('loginPass').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') document.getElementById('loginBtn').click();
+});
+</script>
 
 <script>
 const MAKERS_RAW = [
@@ -517,9 +670,18 @@ const MAKERS = MAKERS_RAW.map(r => ({ name: r[0], aliases: r[1].split(',').map(s
 const MAX_HISTORY = 100, STORAGE_KEY = 'souba_history';
 const makerInput = document.getElementById('maker');
 const modelInput = document.getElementById('model');
+const freewordInput = document.getElementById('freeword');
 const clearMaker = document.getElementById('clearMaker');
 const clearModel = document.getElementById('clearModel');
 const acList = document.getElementById('acList');
+
+// Google Lens: try app scheme, fallback to Google search with lens
+document.getElementById('lensBtn').addEventListener('click', function(e) {
+  // Try to open Google app lens, if fails open Google Lens web
+  setTimeout(function() {
+    window.location.href = 'https://lens.google.com';
+  }, 500);
+});
 
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -539,11 +701,16 @@ function getAucfanPeriod() { const n = new Date(); return (n.getFullYear()-5) + 
 const btnIds = ['btn-yahoo','btn-mercari','btn-ebay','btn-aucfan','btn-amazon','btn-google'];
 const btns = btnIds.map(id => document.getElementById(id));
 
-function getKeyword() { return [makerInput.value.trim(), modelInput.value.trim()].filter(Boolean).join(' '); }
+function getKeyword() {
+  const fw = freewordInput.value.trim();
+  if (fw) return fw;
+  return [makerInput.value.trim(), modelInput.value.trim()].filter(Boolean).join(' ');
+}
 
 function updateLinks() {
   const maker = makerInput.value.trim(), model = modelInput.value.trim();
-  const q = [maker, model].filter(Boolean).join(' ');
+  const fw = freewordInput.value.trim();
+  const q = fw || [maker, model].filter(Boolean).join(' ');
   const has = q.length > 0;
   clearMaker.classList.toggle('show', makerInput.value.length > 0);
   clearModel.classList.toggle('show', modelInput.value.length > 0);
@@ -566,13 +733,16 @@ function updateLinks() {
 // クリック時に履歴保存
 btns.forEach(b => {
   b.addEventListener('click', function() {
-    const maker = makerInput.value.trim(), model = modelInput.value.trim();
+    const fw = freewordInput.value.trim();
+    const maker = fw || makerInput.value.trim();
+    const model = fw ? '' : modelInput.value.trim();
     if (maker || model) addHistory(maker, model);
   });
 });
 
 makerInput.addEventListener('input', () => { updateLinks(); showAC(); });
 modelInput.addEventListener('input', updateLinks);
+freewordInput.addEventListener('input', updateLinks);
 clearMaker.addEventListener('click', () => { makerInput.value = ''; updateLinks(); hideAC(); makerInput.focus(); });
 clearModel.addEventListener('click', () => { modelInput.value = ''; updateLinks(); modelInput.focus(); });
 
